@@ -103,7 +103,17 @@ async def _maybe_session() -> AsyncIterator[object | None]:
     Yields `None` rather than raising: running this with no database is a
     legitimate use, and it should still check everything that needs no data while
     saying clearly what it skipped.
+
+    Reachability is a real query, not a constructed session. SQLAlchemy connects
+    lazily, so `session_scope()` against a host that does not resolve is built
+    without complaint and only fails on the first statement. Probing by
+    construction therefore reported "database reachable" for an unreachable one,
+    the data-dependent checks ran anyway, and `gaierror` came back out of a tool
+    call as a test failure instead of a skip -- which is the one thing this
+    function exists to prevent.
     """
+    from sqlalchemy import text
+
     from backend.database.session import session_scope
 
     context = session_scope()
@@ -113,6 +123,15 @@ async def _maybe_session() -> AsyncIterator[object | None]:
         print(f"         (no database: {type(exc).__name__})")
         yield None
         return
+
+    try:
+        await session.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001 - see above
+        print(f"         (no database: {type(exc).__name__})")
+        await context.__aexit__(None, None, None)
+        yield None
+        return
+
     try:
         yield session
     finally:

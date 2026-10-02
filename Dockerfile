@@ -53,6 +53,13 @@ COPY proto ./proto
 COPY alembic ./alembic
 COPY data ./data
 COPY tests ./tests
+# The CI job that proves the MCP surface works under this image's SDK major runs
+# `python scripts/verify_mcp_sdk.py` inside the built image, because the local
+# venv resolves SDK v1 and the image resolves v2 -- so the container is the only
+# place that branch of the shim can be tested. Without this copy the job failed
+# with "can't open file '/app/scripts/verify_mcp_sdk.py'", which reads like an SDK
+# failure and is a missing file.
+COPY scripts ./scripts
 
 RUN pip install --no-cache-dir /wheels/* && \
     rm -rf /wheels
