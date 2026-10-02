@@ -136,9 +136,17 @@ def main() -> int:
     grpc_port = free_port()
     BASE = f"http://127.0.0.1:{api_port}"
 
+    # The annotation is separate from the assignment on purpose. Written as
+    # `spawn: dict[str, Any] = {...}` inside the branch, mypy discards it when it
+    # evaluates the other branch as the reachable one -- and on Linux it does,
+    # because `sys.platform` is resolved at type-check time. It then infers
+    # `dict[str, bool]` from `{"start_new_session": True}` alone and no Popen
+    # overload accepts that, so CI failed on a script that runs correctly on both
+    # platforms. Declaring first pins the type on every platform.
+    spawn: dict[str, Any]
     if sys.platform == "win32":
         # A new process group, so Ctrl-C does not race the cleanup handlers.
-        spawn: dict[str, Any] = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        spawn = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
     else:
         spawn = {"start_new_session": True}
 
@@ -389,7 +397,13 @@ def main() -> int:
         # CTRL_BREAK_EVENT on Windows because the children were created in their
         # own process group; SIGTERM everywhere else. Either way they get a
         # chance to drain, and a child that ignores it is killed.
-        stop_signal = signal.CTRL_BREAK_EVENT if sys.platform == "win32" else signal.SIGTERM
+        #
+        # `getattr` rather than a bare attribute: CTRL_BREAK_EVENT exists only in
+        # the Windows typeshed, so naming it directly is an attr-defined error on
+        # every other platform even though the branch is unreachable there. The
+        # default is what the non-Windows branch wanted anyway, so this is not a
+        # behavioural change on either platform.
+        stop_signal = getattr(signal, "CTRL_BREAK_EVENT", signal.SIGTERM)
         for process in reversed(processes):
             process.send_signal(stop_signal)
         for process in reversed(processes):
