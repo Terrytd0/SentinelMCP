@@ -146,13 +146,20 @@ def test_the_harness_does_not_depend_on_semgrep_being_on_path() -> None:
     to run this project's suite on Windows. Hence a local fallback, used only
     here and never in the production scanner.
     """
-    if shutil.which("semgrep") is None:
-        candidate = _binary_beside_the_interpreter()
+    on_path = shutil.which("semgrep")
+    candidate = _binary_beside_the_interpreter()
+
+    if on_path is None and candidate is None:
+        # Semgrep is not installed anywhere, so there is no fallback to have and
+        # no behaviour to assert. The dev extra deliberately does not pull
+        # semgrep in -- it is a stretch goal, not a runtime requirement -- so this
+        # is the state of every CI run. Skipping is the answer the rest of this
+        # file already gives, and Rule 1 requires it: a bare `pytest` with nothing
+        # installed must pass. Asserting here instead made the job red on a
+        # machine that was never claiming to have semgrep.
+        pytest.skip("semgrep is not installed")
+
+    if on_path is None:
         assert candidate is not None and Path(candidate).is_file()
     else:
-        assert (
-            _binary_beside_the_interpreter() is None
-            or Path(
-                _binary_beside_the_interpreter()  # type: ignore[arg-type]
-            ).is_file()
-        )
+        assert candidate is None or Path(candidate).is_file()
