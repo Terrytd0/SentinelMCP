@@ -1,0 +1,94 @@
+# Build context exclusions.
+#
+# Without this, every `docker build` uploads the whole working tree to the daemon
+# before it discards most of it. On this machine that is ~590 MB, of which ~589 MB
+# is `.venv` and `.mypy_cache`: the build context arrives, `pip wheel` runs, and
+# nothing from either directory is ever copied into the image.
+#
+# It also makes the image's contents depend on what happens to be in the working
+# directory. `.env` holding a real key, or `data/published/` holding pull requests
+# from a previous `python -m backend.scripts.run_remediation`, would both be copied
+# in. An image whose contents vary with the developer's shell is not reproducible.
+
+# --- Virtual environments ------------------------------------------------
+# A Windows build here and a Linux one in the image. Beyond the dead weight,
+# `/app/.venv` would be found before the installed site-packages, so copying it in
+# is a live hazard rather than only a waste of bandwidth.
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# --- Version control and CI ----------------------------------------------
+# The build copies named directories, not the repository. `.git` is also large and
+# never needed in a layer.
+.git/
+.gitignore
+.github/
+.pre-commit-config.yaml
+
+# --- Local environment ----------------------------------------------------
+# `.env` is gitignored and its API key is empty on a fresh checkout, but "it
+# happens to be empty right now" is not a property to bake into an image: this is
+# the one entry that could leak a real credential into a published layer.
+.env
+.env.*
+!.env.example
+
+# --- Caches ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+.tox/
+.nox/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# --- Generated data inside the copied `data/` tree ------------------------
+# `data/` as a whole is NOT excluded: the Dockerfile copies it, and the CVE feed,
+# the scanner fixtures, the deliberately-vulnerable sample app, the telemetry
+# contract and the evidence corpus are all runtime or test inputs. These two
+# subdirectories are generated, and the second one is the expensive one --
+# `backend/evidence/tier3.py` shallow-clones upstream repositories per advisory,
+# so a run leaves a few hundred megabytes of someone else's source in the working
+# tree. See the matching note in .gitignore.
+data/published/
+data/evidence/.cache/
+data/telemetry/*.jsonl
+!data/telemetry/events.jsonl
+
+# --- Not copied into the image -------------------------------------------
+# The Dockerfile copies named directories, so everything below is dead weight.
+# `docs/` is excluded by name rather than by `*.md`, because `README.md` is
+# explicitly copied and `.dockerignore` cannot re-include a file whose parent is
+# excluded.
+docs/
+Makefile
+LICENSE
+docker/
+
+# Generated gRPC stubs under `backend/grpc_service/generated/` are committed on
+# purpose (CLAUDE.md: nothing warns you if they go stale), so they are
+# deliberately NOT excluded.
+
+# --- Editor and OS --------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
