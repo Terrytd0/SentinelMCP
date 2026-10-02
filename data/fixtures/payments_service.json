@@ -1,0 +1,70 @@
+{
+  "target": "services/payments/",
+  "findings": [
+    {
+      "rule_id": "go.crypto.security.audit.tls-verification-disabled",
+      "title": "TLS certificate verification disabled",
+      "description": "InsecureSkipVerify is set, so any man-in-the-middle with a self-signed certificate is trusted for outbound calls to the payment processor.",
+      "severity": "critical",
+      "confidence": "high",
+      "file_path": "services/payments/gateway.go",
+      "start_line": 31,
+      "end_line": 33,
+      "snippet": "transport := &http.Transport{\n    TLSClientConfig: &tls.Config{InsecureSkipVerify: true},\n}",
+      "cwe_ids": ["CWE-295"],
+      "cve_ids": []
+    },
+    {
+      "rule_id": "go.crypto.security.audit.hardcoded-credential",
+      "title": "Hardcoded API credential",
+      "description": "A live-looking secret key is committed to source control. Anyone with repository read access can charge the merchant account.",
+      "severity": "critical",
+      "confidence": "high",
+      "file_path": "services/payments/config.go",
+      "start_line": 8,
+      "end_line": 8,
+      "snippet": "const StripeSecretKey = \"REDACTED_PLACEHOLDER_NOT_A_REAL_KEY\"",
+      "cwe_ids": ["CWE-798"],
+      "cve_ids": []
+    },
+    {
+      "rule_id": "go.gosec.integer.audit.integer-overflow",
+      "title": "Integer overflow in amount calculation",
+      "description": "Amounts are converted from int64 to int32 before being summed, so a large batch wraps negative and can credit a customer.",
+      "severity": "high",
+      "confidence": "medium",
+      "file_path": "services/payments/settle.go",
+      "start_line": 74,
+      "end_line": 76,
+      "snippet": "var total int32\nfor _, line := range lines {\n    total += int32(line.AmountMinorUnits)\n}",
+      "cwe_ids": ["CWE-190"],
+      "cve_ids": []
+    },
+    {
+      "rule_id": "go.gosec.audit.weak-random",
+      "title": "Weak randomness for transaction reference",
+      "description": "math/rand is used to generate an order reference, which is predictable and therefore guessable by an attacker.",
+      "severity": "medium",
+      "confidence": "high",
+      "file_path": "services/payments/reference.go",
+      "start_line": 19,
+      "end_line": 19,
+      "snippet": "ref := fmt.Sprintf(\"ord_%d\", rand.Intn(1_000_000))",
+      "cwe_ids": ["CWE-338"],
+      "cve_ids": []
+    },
+    {
+      "rule_id": "python.pip.requirements.vulnerable-requests",
+      "title": "Vulnerable dependency: requests 2.25.1 (CVE-2023-32681)",
+      "description": "requests before 2.31.0 leaks Proxy-Authorization headers to a destination that has been redirected to, on the same host as the proxy.",
+      "severity": "medium",
+      "confidence": "high",
+      "file_path": "services/payments/requirements.txt",
+      "start_line": 2,
+      "end_line": 2,
+      "snippet": "requests==2.25.1",
+      "cwe_ids": ["CWE-200"],
+      "cve_ids": ["CVE-2023-32681"]
+    }
+  ]
+}

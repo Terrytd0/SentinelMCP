@@ -1,0 +1,105 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Testing / coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.tox/
+.nox/
+nosetests.xml
+
+# --- Type checking / linting ---
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pytype/
+
+# --- Package managers ---
+uv.lock.bak
+pip-log.txt
+pip-delete-this-directory.txt
+
+# --- IDE / editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Docker ---
+docker/*.log
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Runtime telemetry output ---
+# The seeded/committed sample is kept (it is what docs/architecture.md
+# screenshots and the Aegis contract test read); anything else written at
+# runtime is not worth committing.
+data/telemetry/*.jsonl
+!data/telemetry/events.jsonl
+
+# --- Publisher output ---
+# The "pushed" PRs from backend/services/publisher.py land here. Generated
+# artifacts, not source: regenerate with
+# `python -m backend.scripts.run_remediation`.
+data/published/
+
+# --- Evidence harness (docs/evidence.md) ---
+# Upstream repositories fetched on demand by backend/evidence/tier3.py, one
+# shallow clone of two commits per advisory. Deliberately NOT committed:
+# vendoring someone else's source imports their licence and their maintenance
+# burden for no benefit, since the manifest in data/evidence/corpus.json already
+# records every advisory and fix commit this project uses.
+#
+# Without this, `python scripts/evidence_report.py` leaves a few hundred megabytes
+# of third-party git repositories in the working tree, and a reviewer cloning the
+# repo would silently get all of them.
+data/evidence/.cache/

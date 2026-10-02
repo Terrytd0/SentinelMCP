@@ -1,0 +1,160 @@
+# Local development stack for SentinelMCP.
+# Not a production deployment -- there is no Kubernetes here, by design: the
+# interesting deployment story is Sprint 9 (ForgeOps). See docs/architecture.md.
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d --build
+#   docker compose exec api python -m backend.scripts.seed
+#
+# The `migrate` service is a one-shot that runs `alembic upgrade head` to
+# completion; `api` and `scanner` wait for it to exit successfully, so a
+# half-migrated database can never serve a request. That ordering is the whole
+# reason migrations are a separate service rather than a startup command in the
+# API: two replicas starting simultaneously would race to migrate.
+
+services:
+  # --- One-shot schema migration -------------------------------------------
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    env_file:
+      - .env
+    environment:
+      SENTINEL_DATABASE_URL: postgresql+asyncpg://sentinel:sentinel@postgres:5432/sentinel
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # --- FastAPI triage API ---------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
+    ports:
+      - "${SENTINEL_API_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      SENTINEL_DATABASE_URL: postgresql+asyncpg://sentinel:sentinel@postgres:5432/sentinel
+      # A real scanning service, so this process genuinely crosses the gRPC
+      # boundary. `SENTINEL_SCANNER_TRANSPORT` stays at its `auto` default,
+      # which means a scan that silently fell back to in-process would show up
+      # in the log rather than being invisible.
+      SENTINEL_GRPC_CLIENT_TARGET: scanner:50051
+    volumes:
+      # data/ is mounted rather than baked in so the telemetry JSONL and the
+      # publisher's output survive `docker compose build`.
+      - ./data:/app/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      scanner:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # --- gRPC scanning service -----------------------------------------------
+  # A separate process because scans are CPU-bound and subprocess-heavy while
+  # the API is I/O-bound. Sharing a process means one slow Semgrep run makes
+  # /health time out.
+  scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "backend.scripts.run_grpc_server"]
+    restart: unless-stopped
+    ports:
+      - "${SENTINEL_GRPC_SERVER_PORT:-50051}:50051"
+    env_file:
+      - .env
+    environment:
+      SENTINEL_DATABASE_URL: postgresql+asyncpg://sentinel:sentinel@postgres:5432/sentinel
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+
+  # --- The MCP tool server --------------------------------------------------
+  # Not started by default. The MCP stdio transport is a *client-launched*
+  # subprocess, not a service: Claude Desktop spawns it from an `mcpServers`
+  # block, so there is nothing to "up". This profile exists for the
+  # streamable-http transport, where a network-reachable server is the point.
+  #   docker compose --profile mcp-http up -d mcp
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "backend.scripts.run_mcp_server", "--transport", "streamable-http", "--port", "8080"]
+    profiles: ["mcp-http"]
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      SENTINEL_DATABASE_URL: postgresql+asyncpg://sentinel:sentinel@postgres:5432/sentinel
+      SENTINEL_GRPC_CLIENT_TARGET: scanner:50051
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      scanner:
+        condition: service_started
+
+  # --- PostgreSQL: system of record ----------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: sentinel
+      POSTGRES_DB: sentinel
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Runs once, on an empty data directory. Creates the test database the
+      # integration suite truncates, so `docker compose up` is the only setup
+      # step and no developer has to remember to `createdb` by hand.
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -U/-d explicit: the default check connects to a database named after
+      # POSTGRES_USER, which does not exist here.
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- Redis ---------------------------------------------------------------
+  # Deliberately absent, and the reason is worth stating because a reviewer
+  # will notice. An earlier revision declared a Redis service, a
+  # SENTINEL_REDIS_URL, a SENTINEL_SCAN_CACHE_TTL_SECONDS, and a fakeredis dev
+  # dependency, all justified as "for rate limiting and a scan-result cache" --
+  # and none of it was implemented. Redis is not part of this sprint's scope:
+  # the roadmap builds it properly in Sprint 4 (SupportOps AI) and reuses it in
+  # Sprints 7 and 10. A cache that is declared but absent is worse than no
+  # cache, because a reader assumes it is protecting something.
+  # If you add real caching, add the service, the settings, and the tests in
+  # the same change.
+
+volumes:
+  postgres_data:

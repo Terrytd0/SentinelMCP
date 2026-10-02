@@ -1,0 +1,53 @@
+{
+  "CVE-2024-22195": {
+    "cve_id": "CVE-2024-22195",
+    "title": "jinja2 sandbox escape via str.format",
+    "description": "An oversight in how Jinja sandboxes function calls allows an attacker who controls both template content and the format string to execute arbitrary Python. Specifically, str.format passes attribute lookups straight through to format_map, defeating the sandbox's attribute blacklist.",
+    "cvss_score": 5.4,
+    "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:L/A:N",
+    "severity": "high",
+    "cwe_ids": ["CWE-1336"],
+    "affected_products": [
+      {"product": "jinja2", "version_range": "< 3.1.3", "fixed_in": "3.1.3"}
+    ],
+    "exploit_maturity": "poc",
+    "remediation": "Upgrade jinja2 to 3.1.3 or later. If an upgrade is not immediately possible, remove format/format_map from the template environment's globals, which closes this specific bypass without changing other template behaviour.",
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2024-22195",
+      "https://github.com/pallets/jinja/security/advisories/GHSA-h5c8-rqwp-cp95"
+    ]
+  },
+  "CVE-2023-46695": {
+    "cve_id": "CVE-2023-46695",
+    "title": "Django denial of service via multipart form parsing",
+    "description": "An attacker can force the running server to consume a very large amount of CPU by sending a crafted multipart form with a large number of parts, exhausting worker threads and taking the application offline.",
+    "cvss_score": 7.5,
+    "cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+    "severity": "high",
+    "cwe_ids": ["CWE-400"],
+    "affected_products": [
+      {"product": "django", "version_range": "< 4.2.5", "fixed_in": "4.2.5"}
+    ],
+    "exploit_maturity": "poc",
+    "remediation": "Upgrade Django to 4.2.5 or later, or to the latest 4.2.x patch release. As an interim mitigation, set DATA_UPLOAD_MAX_NUMBER_FIELDS to a low value to bound multipart parsing.",
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2023-46695",
+      "https://www.djangoproject.com/weblog/2023/oct/11/security-releases/"
+    ]
+  },
+  "CVE-2023-32681": {
+    "cve_id": "CVE-2023-32681",
+    "title": "requests leaks Proxy-Authorization header on redirect",
+    "description": "When requests is configured with a proxy and the request is redirected, the Proxy-Authorization header is retained and sent to the redirect target rather than being stripped, exposing proxy credentials.",
+    "cvss_score": 6.1,
+    "cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N",
+    "severity": "medium",
+    "cwe_ids": ["CWE-200"],
+    "affected_products": [
+      {"product": "requests", "version_range": "< 2.31.0", "fixed_in": "2.31.0"}
+    ],
+    "exploit_maturity": "unproven",
+    "remediation": "Upgrade requests to 2.31.0 or later. Where a proxy is in use, audit proxy logs for any unexpected Authorization-bearing requests.",
+    "references": ["https://nvd.nist.gov/vuln/detail/CVE-2023-32681"]
+  }
+}

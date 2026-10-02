@@ -1,0 +1,422 @@
+{
+  "schema": "sentinelmcp/evidence-corpus/1",
+  "source": "https://api.osv.dev/v1/query (OSV.dev), GitHub Security Advisory data",
+  "note": "Advisory metadata only -- no upstream source is vendored. backend/evidence/corpus.py fetches the fix commit on demand.",
+  "advisories": [
+    {
+      "advisory": "GHSA-j8r2-6x86-q33q",
+      "package": "requests",
+      "repo": "psf/requests",
+      "cwe_ids": [
+        "CWE-200"
+      ],
+      "aliases": [
+        "CVE-2023-32681",
+        "PYSEC-2023-74"
+      ],
+      "fixed_in": [
+        "2.31.0"
+      ],
+      "fix_commits": [
+        "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5"
+      ],
+      "why": "redirect strips Proxy-Authorization",
+      "summary": "Unintended leak of Proxy-Authorization header in requests"
+    },
+    {
+      "advisory": "GHSA-mv8g-fhh6-6267",
+      "package": "django",
+      "repo": "django/django",
+      "cwe_ids": [
+        "CWE-798"
+      ],
+      "aliases": [
+        "CVE-2016-9013",
+        "PYSEC-2016-17"
+      ],
+      "fixed_in": [
+        "1.10.3",
+        "1.8.16",
+        "1.9.11"
+      ],
+      "fix_commits": [
+        "34e10720d81b8d407aa14d763b6a7fe8f13b4f2e",
+        "4844d86c7728c1a5a3bbce4ad336a8d32304072b",
+        "70f99952965a430daf69eeb9947079aae535d2d0"
+      ],
+      "why": "hardcoded credential in settings",
+      "summary": "Django user with hardcoded password created when running tests on Oracle"
+    },
+    {
+      "advisory": "GHSA-4x4j-2g7c-83w6",
+      "package": "pillow",
+      "repo": "python-pillow/Pillow",
+      "cwe_ids": [
+        "CWE-78"
+      ],
+      "aliases": [
+        "BIT-pillow-2026-55798",
+        "CVE-2026-55798",
+        "PYSEC-2026-2257"
+      ],
+      "fixed_in": [
+        "12.3.0"
+      ],
+      "fix_commits": [
+        "8404ea5fe5df40fc34aa1e51403dd6fce0778b8a",
+        "88194166691b7b603529b8b036ab3ab9cedd2de4",
+        "b0e06caa64c1405aa3da0bb1d2bd9a77ca22de7f"
+      ],
+      "why": "OS command injection, shell path",
+      "summary": "Pillow: WindowsViewer.get_command() OS command injection via unescaped shell path"
+    },
+    {
+      "advisory": "GHSA-3wq7-rqq7-wx6j",
+      "package": "aiohttp",
+      "repo": "aio-libs/aiohttp",
+      "cwe_ids": [
+        "CWE-770"
+      ],
+      "aliases": [
+        "CVE-2026-34517",
+        "PYSEC-2026-2099"
+      ],
+      "fixed_in": [
+        "3.13.4"
+      ],
+      "fix_commits": [
+        "cbb774f38330563422ca0c413a71021d7b944145"
+      ],
+      "why": "late size enforcement, memory DoS",
+      "summary": "AIOHTTP has late size enforcement for non-file multipart fields causes memory DoS"
+    },
+    {
+      "advisory": "GHSA-cf7p-gm2m-833m",
+      "package": "cryptography",
+      "repo": "pyca/cryptography",
+      "cwe_ids": [
+        "CWE-295"
+      ],
+      "aliases": [
+        "CVE-2023-38325",
+        "PYSEC-2023-112"
+      ],
+      "fixed_in": [
+        "41.0.2"
+      ],
+      "fix_commits": [
+        "1ca7adc97b76a9dfbd3d850628b613eb93b78fc3"
+      ],
+      "why": "NULL dereference, cert loading",
+      "summary": "cryptography mishandles SSH certificates"
+    },
+    {
+      "advisory": "GHSA-9wx4-h78v-vm56",
+      "package": "requests",
+      "repo": "psf/requests",
+      "cwe_ids": [
+        "CWE-670"
+      ],
+      "aliases": [
+        "CVE-2024-35195",
+        "PYSEC-2026-1873"
+      ],
+      "fixed_in": [
+        "2.32.0"
+      ],
+      "fix_commits": [
+        "a58d7f2ffb4d00b46dca2d70a3932a0b37e22fac"
+      ],
+      "why": "redirect leaks .netrc credentials",
+      "summary": "Requests `Session` object does not verify requests after making first request with verify=False"
+    },
+    {
+      "advisory": "GHSA-966j-vmvw-g2g9",
+      "package": "aiohttp",
+      "repo": "aio-libs/aiohttp",
+      "cwe_ids": [
+        "CWE-200"
+      ],
+      "aliases": [
+        "CVE-2026-34518",
+        "PYSEC-2026-2100"
+      ],
+      "fixed_in": [
+        "3.13.4"
+      ],
+      "fix_commits": [
+        "5351c980dcec7ad385730efdf4e1f4338b24fdb6"
+      ],
+      "why": "Authorization not stripped on redirect",
+      "summary": "AIOHTTP leaks Cookie and Proxy-Authorization headers on cross-origin redirect"
+    },
+    {
+      "advisory": "GHSA-2vrm-gr82-f7m5",
+      "package": "aiohttp",
+      "repo": "aio-libs/aiohttp",
+      "cwe_ids": [
+        "CWE-113"
+      ],
+      "aliases": [
+        "CVE-2026-34514",
+        "PYSEC-2026-2096"
+      ],
+      "fixed_in": [
+        "3.13.4"
+      ],
+      "fix_commits": [
+        "9a6ada97e2c6cf1ce31727c6c9fcea17c21f6f06"
+      ],
+      "why": "CRLF injection, multipart",
+      "summary": "AIOHTTP has CRLF injection through multipart part content type header construction"
+    },
+    {
+      "advisory": "GHSA-2gwj-7jmv-h26r",
+      "package": "django",
+      "repo": "django/django",
+      "cwe_ids": [
+        "CWE-89"
+      ],
+      "aliases": [
+        "BIT-django-2022-28346",
+        "CVE-2022-28346",
+        "PYSEC-2022-190"
+      ],
+      "fixed_in": [
+        "2.2.28",
+        "3.2.13",
+        "4.0.4"
+      ],
+      "fix_commits": [
+        "2044dac5c6968441be6f534c4139bcf48c5c7e48",
+        "2c09e68ec911919360d5f8502cefc312f9e03c5d",
+        "800828887a0509ad1162d6d407e94d8de7eafc60",
+        "93cae5cb2f9a4ef1514cf1a41f714fef08005200"
+      ],
+      "why": "SQL injection, union query",
+      "summary": "SQL Injection in Django"
+    },
+    {
+      "advisory": "GHSA-6r97-cj55-9hrq",
+      "package": "django",
+      "repo": "django/django",
+      "cwe_ids": [
+        "CWE-89"
+      ],
+      "aliases": [
+        "CVE-2019-14234",
+        "PYSEC-2019-13"
+      ],
+      "fixed_in": [
+        "1.11.23",
+        "2.1.11",
+        "2.2.4"
+      ],
+      "fix_commits": [
+        "4f5b58f5cd3c57fee9972ab074f8dc6895d8f387",
+        "ed682a24fca774818542757651bfba576c3fc3ef",
+        "f74b3ae3628c26e1b4f8db3d13a91d52a833a975"
+      ],
+      "why": "SQL injection, improper neutralisation",
+      "summary": "SQL Injection in Django"
+    },
+    {
+      "advisory": "GHSA-6wcr-wcqm-3mfh",
+      "package": "django",
+      "repo": "django/django",
+      "cwe_ids": [
+        "CWE-200"
+      ],
+      "aliases": [
+        "CVE-2015-8213",
+        "PYSEC-2015-11"
+      ],
+      "fixed_in": [
+        "1.7.11",
+        "1.8.7",
+        "1.9rc2"
+      ],
+      "fix_commits": [
+        "316bc3fc9437c5960c24baceb93c73f1939711e4",
+        "3ebbda0aef9e7a90ac6208bb8f9bc21228e2c7da",
+        "8a01c6b53169ee079cb21ac5919fdafcc8c5e172",
+        "9f83fc2f66f5a0bac7c291aec55df66050bb6991"
+      ],
+      "why": "session cookie exposed on redirect",
+      "summary": "Django settings leak in date template filter"
+    },
+    {
+      "advisory": "GHSA-q4xr-rc97-m4xx",
+      "package": "celery",
+      "repo": "celery/celery",
+      "cwe_ids": [
+        "CWE-77",
+        "CWE-78"
+      ],
+      "aliases": [
+        "CVE-2021-23727",
+        "PYSEC-2021-858",
+        "SNYK-PYTHON-CELERY-2314953"
+      ],
+      "fixed_in": [
+        "5.2.2"
+      ],
+      "fix_commits": [
+        "1f7ad7e6df1e02039b6ab9eec617d283598cad6b"
+      ],
+      "why": "OS command injection",
+      "summary": "OS Command Injection in celery"
+    },
+    {
+      "advisory": "GHSA-r854-96gq-rfg3",
+      "package": "pillow",
+      "repo": "python-pillow/Pillow",
+      "cwe_ids": [
+        "CWE-200"
+      ],
+      "aliases": [
+        "CVE-2014-1933",
+        "PYSEC-2014-23"
+      ],
+      "fixed_in": [
+        "2.3.1"
+      ],
+      "fix_commits": [
+        "4e9f367dfd3f04c8f5d23f7f759ec12782e10ee7"
+      ],
+      "why": "temp file name leakage",
+      "summary": "Pillow Temporary file name leakage"
+    },
+    {
+      "advisory": "GHSA-3f63-hfp8-52jq",
+      "package": "pillow",
+      "repo": "python-pillow/Pillow",
+      "cwe_ids": [
+        "CWE-94",
+        "CWE-95"
+      ],
+      "aliases": [
+        "BIT-pillow-2023-50447",
+        "CVE-2023-50447",
+        "PYSEC-2026-457"
+      ],
+      "fixed_in": [
+        "10.2.0"
+      ],
+      "fix_commits": [
+        "45c726fd4daa63236a8f3653530f297dc87b160a"
+      ],
+      "why": "arbitrary code execution in eval",
+      "summary": "Arbitrary Code Execution in Pillow"
+    },
+    {
+      "advisory": "GHSA-5phf-pp7p-vc2r",
+      "package": "urllib3",
+      "repo": "urllib3/urllib3",
+      "cwe_ids": [
+        "CWE-295"
+      ],
+      "aliases": [
+        "CVE-2021-28363",
+        "PYSEC-2021-59"
+      ],
+      "fixed_in": [
+        "1.26.4"
+      ],
+      "fix_commits": [
+        "8d65ea1ecf6e2cdc27d42124e587c1b83a3118b0"
+      ],
+      "why": "proxy TLS hostname not verified",
+      "summary": "Using default SSLContext for HTTPS requests in an HTTPS proxy doesn't verify certificate hostname for proxy connection"
+    },
+    {
+      "advisory": "GHSA-mh33-7rrq-662w",
+      "package": "urllib3",
+      "repo": "urllib3/urllib3",
+      "cwe_ids": [
+        "CWE-295"
+      ],
+      "aliases": [
+        "CVE-2019-11324",
+        "PYSEC-2019-133"
+      ],
+      "fixed_in": [
+        "1.24.2"
+      ],
+      "fix_commits": [
+        "1efadf43dc63317cd9eaa3e0fdb9e05ab07254b1"
+      ],
+      "why": "improper certificate validation",
+      "summary": "Improper Certificate Validation in urllib3"
+    },
+    {
+      "advisory": "GHSA-gwvm-45gx-3cf8",
+      "package": "urllib3",
+      "repo": "urllib3/urllib3",
+      "cwe_ids": [
+        "CWE-200",
+        "CWE-601"
+      ],
+      "aliases": [
+        "CVE-2018-25091",
+        "PYSEC-2023-207"
+      ],
+      "fixed_in": [
+        "1.24.2"
+      ],
+      "fix_commits": [
+        "adb358f8e06865406d1f05e581a16cbea2136fbc"
+      ],
+      "why": "Authorization forwarded on redirect",
+      "summary": "Authorization Header forwarded on redirect"
+    },
+    {
+      "advisory": "GHSA-v845-jxx5-vc9f",
+      "package": "urllib3",
+      "repo": "urllib3/urllib3",
+      "cwe_ids": [
+        "CWE-200"
+      ],
+      "aliases": [
+        "CVE-2023-43804",
+        "PYSEC-2023-192"
+      ],
+      "fixed_in": [
+        "1.26.17",
+        "2.0.6"
+      ],
+      "fix_commits": [
+        "01220354d389cd05474713f8c982d05c9b17aafb",
+        "644124ecd0b6e417c527191f866daa05a5a2056d"
+      ],
+      "why": "Cookie not stripped cross-origin",
+      "summary": "`Cookie` HTTP header isn't stripped on cross-origin redirects"
+    },
+    {
+      "advisory": "GHSA-www2-v7xj-xrc6",
+      "package": "urllib3",
+      "repo": "urllib3/urllib3",
+      "cwe_ids": [
+        "CWE-200"
+      ],
+      "aliases": [
+        "CVE-2018-20060",
+        "PYSEC-2018-32"
+      ],
+      "fixed_in": [
+        "1.23"
+      ],
+      "fix_commits": [
+        "560bd227b90f74417ffaedebf5f8d05a8ee4f532"
+      ],
+      "why": "sensitive info in exception body",
+      "summary": "Exposure of Sensitive Information to an Unauthorized Actor in urllib3"
+    }
+  ],
+  "order": "Deliberate, not alphabetical. `backend/evidence/runner.py` fetches the first six by default, and an alphabetical manifest would make those six all aiohttp -- none of which has a line any rule can act on -- so a default run would read as 0% coverage and look broken rather than honest. The first six span five repositories, six CWEs, and both outcomes: three advisories where a rule engages and three where none does. `python scripts/evidence_report.py --all` runs the remaining thirteen.",
+  "caveats": [
+    "The vulnerable-file line is found by scanning for a pattern the rule table already matches, so the coverage figure is an UPPER bound on what the engine could find, not a measurement of how many real vulnerabilities it detects.",
+    "Excluded from the per-file counts: test, docs, example, benchmark and vendor paths. A fix that rewrites a test is not a fix to the vulnerability.",
+    "An advisory fixed by a merge commit is diffed against its first parent, and is marked `is_merge` in the output."
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "target": "app/",
+  "findings": [
+    {
+      "rule_id": "python.lang.security.audit.eval-detected",
+      "title": "Dynamic code execution via eval()",
+      "description": "eval() executes arbitrary Python from a string. If any part of the string originates from user input, an attacker achieves remote code execution.",
+      "severity": "critical",
+      "confidence": "high",
+      "file_path": "app/handlers/report.py",
+      "start_line": 42,
+      "end_line": 42,
+      "snippet": "    expression = request.args.get('expr', '')\n    return render(eval(expression))",
+      "cwe_ids": ["CWE-95"],
+      "cve_ids": []
+    },
+    {
+      "rule_id": "python.sqlalchemy.security.audit.raw-query",
+      "title": "Raw SQL string built from request input",
+      "description": "A SQL statement is assembled with Python string formatting and then executed. Any interpolated value lets an attacker alter the query.",
+      "severity": "critical",
+      "confidence": "high",
+      "file_path": "app/handlers/search.py",
+      "start_line": 88,
+      "end_line": 91,
+      "snippet": "    term = request.args.get('q', '')\n    sql = f\"SELECT * FROM reports WHERE title LIKE '%{term}%'\"\n    rows = session.execute(text(sql)).all()",
+      "cwe_ids": ["CWE-89"],
+      "cve_ids": []
+    },
+    {
+      "rule_id": "python.lang.security.audit.subprocess-shell-true",
+      "title": "Subprocess called with shell=True",
+      "description": "shell=True passes the command to a shell, so any interpolated argument is interpreted as shell syntax.",
+      "severity": "high",
+      "confidence": "high",
+      "file_path": "app/services/export.py",
+      "start_line": 23,
+      "end_line": 23,
+      "snippet": "    subprocess.run(f\"soffice --headless --convert-to pdf {path}\", shell=True, check=True)",
+      "cwe_ids": ["CWE-78"],
+      "cve_ids": []
+    },
+    {
+      "rule_id": "python.django.security.audit.secure-views-off",
+      "title": "View missing @csrf_exempt protection audit",
+      "description": "This view mutates state over POST but does not declare a CSRF policy, so it relies entirely on framework defaults.",
+      "severity": "medium",
+      "confidence": "medium",
+      "file_path": "app/views/settings.py",
+      "start_line": 17,
+      "end_line": 17,
+      "snippet": "@require_POST\ndef update_org_settings(request):",
+      "cwe_ids": ["CWE-352"],
+      "cve_ids": []
+    },
+    {
+      "rule_id": "python.pip.requirements.vulnerable-jinja2",
+      "title": "Vulnerable dependency: jinja2 2.11.0 (CVE-2024-22195)",
+      "description": "jinja2 before 3.1.3 allows attribute access to bypass the sandbox via str.format. A sandboxed template rendering untrusted input is exploitable.",
+      "severity": "high",
+      "confidence": "high",
+      "file_path": "requirements.txt",
+      "start_line": 4,
+      "end_line": 4,
+      "snippet": "jinja2==2.11.0",
+      "cwe_ids": ["CWE-1336"],
+      "cve_ids": ["CVE-2024-22195"]
+    },
+    {
+      "rule_id": "python.pip.requirements.vulnerable-django",
+      "title": "Vulnerable dependency: django 3.2.18 (CVE-2023-46695)",
+      "description": "Django before 4.2.5 allows a denial of service via a crafted multipart form. Publicly disclosed with a working proof of concept.",
+      "severity": "high",
+      "confidence": "high",
+      "file_path": "requirements.txt",
+      "start_line": 1,
+      "end_line": 1,
+      "snippet": "Django==3.2.18",
+      "cwe_ids": ["CWE-400"],
+      "cve_ids": ["CVE-2023-46695"]
+    },
+    {
+      "rule_id": "python.lang.security.audit.telnet-enabled",
+      "title": "Telnet service enabled",
+      "description": "The device configuration enables telnet, which transmits credentials in clear text.",
+      "severity": "low",
+      "confidence": "high",
+      "file_path": "infra/network.conf",
+      "start_line": 12,
+      "end_line": 12,
+      "snippet": " service telnet\n  no login local",
+      "cwe_ids": ["CWE-319"],
+      "cve_ids": []
+    },
+    {
+      "rule_id": "python.lang.security.audit.debug-enabled",
+      "title": "DEBUG mode enabled in production settings",
+      "description": "DEBUG = True returns full stack traces to the client, leaking file paths, settings, and query text.",
+      "severity": "medium",
+      "confidence": "high",
+      "file_path": "config/production.py",
+      "start_line": 9,
+      "end_line": 9,
+      "snippet": "DEBUG = True",
+      "cwe_ids": ["CWE-489"],
+      "cve_ids": []
+    }
+  ]
+}

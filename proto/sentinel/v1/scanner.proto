@@ -1,0 +1,193 @@
+// SentinelMCP scanning service contract.
+//
+// This is the typed boundary between "something that can produce findings"
+// (Semgrep, OWASP ZAP, a dependency auditor, a fixture file) and everything
+// that consumes findings (the MCP tool surface, the SLA dashboard, the audit
+// log). Deliberately a *service* contract rather than a set of Python
+// dataclasses: a scanner can be written in any language and still speak this
+// schema, which is the whole point of picking gRPC over a JSON HTTP API for
+// this hop. See docs/adr/003-grpc-scanning-boundary.md.
+//
+// Design rules for this file:
+//   * `package sentinel.v1` -- versioned from day one. Breaking changes get a
+//     `sentinel.v2`; the scanner fleet is exactly the kind of set of
+//     independently-deployed processes where you cannot coordinate an
+//     unversioned wire format.
+//   * Field numbers are never reused or renumbered, only appended to.
+//   * Enums are explicitly numbered so an unknown severity arriving from a
+//     newer scanner degrades to a known value instead of crashing the client.
+//   * No business logic lives in here. This file describes shape, not policy.
+
+syntax = "proto3";
+
+package sentinel.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/ironclad/sentinel/gen/sentinel/v1;sentinelv1";
+
+// How much a finding should worry a human. Ordered by triage urgency: the
+// numbers ARE the ordering, and the SLA engine relies on that (lower enum
+// value == shorter remediation SLA). The gaps (10/20/30/40) leave room to
+// insert a tier later without renumbering.
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;  // Never stored. Treated as SEVERITY_LOW and logged.
+  SEVERITY_CRITICAL = 10;     // Actively exploited / data breach in progress.
+  SEVERITY_HIGH = 20;         // Remotely exploitable with real impact.
+  SEVERITY_MEDIUM = 30;       // Exploitable with preconditions.
+  SEVERITY_LOW = 40;          // Defence in depth / hardening.
+  SEVERITY_INFO = 50;         // Informational, no action required.
+}
+
+// Which tool produced the finding. Kept as a string rather than an enum on
+// purpose: scanners are third-party processes that get added and removed
+// independently, and an unknown name from an unrecognised scanner must
+// round-trip losslessly instead of collapsing to UNSPECIFIED.
+enum ScannerKind {
+  SCANNER_KIND_UNSPECIFIED = 0;
+  SCANNER_KIND_FIXTURE = 1;   // Deterministic, offline, used by tests + demos.
+  SCANNER_KIND_SEMGREP = 2;   // Real SAST.
+  SCANNER_KIND_ZAP = 3;       // Real DAST.
+  SCANNER_KIND_DEPENDENCY = 4;// Dependency audit (e.g. pip-audit).
+}
+
+// How an analyst can trust this finding, independent of how bad it is.
+// Severity answers "if real, how bad?"; confidence answers "is it real?".
+// Keeping them orthogonal is what stops a speculative LOW-confidence CRITICAL
+// from jumping the queue.
+enum Confidence {
+  CONFIDENCE_UNSPECIFIED = 0;
+  CONFIDENCE_LOW = 1;         // Pattern-matched, not confirmed. Needs a human look.
+  CONFIDENCE_MEDIUM = 2;
+  CONFIDENCE_HIGH = 3;        // Scanner confirmed exploitability (e.g. DAST proof).
+}
+
+// A single security finding. One of these is the atomic unit of work the
+// whole system reasons about: it has an identity, a location, a severity, a
+// remediation state, and -- critically -- a provenance record.
+message Finding {
+  // Stable, content-derived identity. Two scans of the same unchanged code
+  // must produce the same fingerprint, so re-scanning updates a finding rather
+  // than duplicating it. This is what makes `Scan` safely re-runnable.
+  string fingerprint = 1;
+
+  // Scanner-native rule identifier, e.g. "python.lang.security.audit.eval-detected"
+  // for Semgrep, or a ZAP alert id. Unique within a (scanner_kind, target) pair.
+  string rule_id = 2;
+
+  string title = 3;
+  string description = 4;
+
+  Severity severity = 5;
+  Confidence confidence = 6;
+  ScannerKind scanner_kind = 7;
+
+  // What was scanned. A repo-relative path, a package name, or a URL for DAST.
+  string target = 8;
+
+  // Source location. Empty for DAST/dependency findings that have no single file.
+  string file_path = 9;
+  int32 start_line = 10;
+  int32 end_line = 11;
+
+  // The offending source lines, verbatim. Truncated by the scanner, never
+  // invented here -- an agent drafting a patch needs the real code to patch.
+  string snippet = 12;
+
+  // CWE identifiers, e.g. ["CWE-79", "CWE-89"]. Multiple because one rule
+  // commonly maps to several weaknesses.
+  repeated string cwe_ids = 13;
+
+  // CVE identifiers this finding is known to correspond to. Empty for purely
+  // static pattern matches with no public advisory.
+  repeated string cve_ids = 14;
+
+  // Scanner-native payload preserved verbatim so nothing is lost in
+  // translation and a finding can always be explained in the scanner's own terms.
+  string raw_payload_json = 15;
+
+  google.protobuf.Timestamp detected_at = 16;
+}
+
+// Severity counts for a scan. A separate message rather than a map so the
+// field set is explicit and stable for dashboard consumers.
+message SeverityCounts {
+  int32 critical = 1;
+  int32 high = 2;
+  int32 medium = 3;
+  int32 low = 4;
+  int32 info = 5;
+
+  // Sum of all of the above. Carried explicitly so a client never has to
+  // trust its own arithmetic against a future enum value.
+  int32 total = 6;
+}
+
+message ScanRequest {
+  // What to scan. Interpreted per scanner_kind: a path for SAST, a base URL
+  // for DAST, a requirements.txt for the dependency auditor.
+  string target = 1;
+
+  // Which scanners to run. Empty means "the service's configured default set".
+  repeated ScannerKind scanners = 2;
+
+  // Findings below this severity are dropped by the scanner. SCANNER_KIND_...
+  // n/a: SEVERITY_UNSPECIFIED means no filter.
+  Severity min_severity = 3;
+
+  // Client-supplied correlation id, echoed back in the response and copied onto
+  // every Finding's audit record. Lets an operator tie a scan to the operator
+  // or CI job that requested it.
+  string correlation_id = 4;
+}
+
+message ScanResponse {
+  string scan_id = 1;
+  ScannerKind scanner_kind = 2;
+  string target = 3;
+  repeated Finding findings = 4;
+  SeverityCounts counts = 5;
+  google.protobuf.Timestamp started_at = 6;
+  int64 duration_ms = 7;
+  string correlation_id = 8;
+
+  // Populated instead of findings when the scanner itself failed. A scanner
+  // that cannot run must not look like a scanner that found nothing -- an empty
+  // findings list is a claim ("no issues"), an error is a different claim
+  // ("we could not look"), and conflating them is how real findings get missed.
+  string error = 9;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+  string version = 2;
+  // Scanners this service instance can actually run right now, e.g. only
+  // SCANNER_KIND_FIXTURE if the semgrep binary is not installed. Clients can
+  // use this to avoid requesting a scan that will come back as an error.
+  repeated ScannerKind available_scanners = 3;
+
+  // Targets the fixture scanner will serve, e.g. ["app/", "services/payments/"].
+  //
+  // This is here because of a bug it fixes. `GET /scans/targets` originally
+  // answered by reaching into `scanner_backend._registry` -- a private
+  // attribute of the in-process client -- so over a real gRPC connection it
+  // silently returned an empty list. The endpoint is how a client discovers
+  // which target strings produce deterministic output, and it has to work
+  // whichever transport the client is on. Capabilities that a client needs
+  // belong on the wire, not behind a private attribute.
+  //
+  // Empty for a service with no fixture scanner, which is the honest answer.
+  repeated string fixture_targets = 4;
+}
+
+service ScannerService {
+  // Run one scanner over one target. Synchronous: a scan is a bounded batch
+  // job, not a stream. Long scans belong behind a job/polling API, not a
+  // streaming RPC that holds a connection open.
+  rpc Scan(ScanRequest) returns (ScanResponse);
+
+  // Liveness + real capability report (which scanners are wired up).
+  rpc Health(HealthRequest) returns (HealthResponse);
+}

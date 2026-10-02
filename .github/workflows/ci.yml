@@ -1,0 +1,269 @@
+name: ci
+
+# Mirrors `make check`, then adds the two things a local run cannot do: a
+# throwaway PostgreSQL for the integration suite, and a container build.
+#
+# The `needs:` chain is not decoration. It is the ordering argument from
+# docs/architecture.md, executed: a change that breaks formatting should not
+# spend a Postgres container and an image build to find out.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keeps every job on the same interpreter the Dockerfile uses. mypy is
+  # configured for 3.13, and running it on 3.12 would type-check against a
+  # different standard library.
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  # --- 1. format ---------------------------------------------------------
+  format:
+    name: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install --quiet "ruff==0.16.9"
+      - name: ruff format --check
+        run: ruff format --check .
+
+  # --- 2. lint -----------------------------------------------------------
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install --quiet "ruff==0.16.9"
+      - name: ruff check
+        run: ruff check .
+
+  # --- 3. types ----------------------------------------------------------
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install --quiet -e ".[dev]"
+      - name: mypy
+        run: mypy .
+
+  # --- 4. unit tests -----------------------------------------------------
+  # No service container: the invariant is that a bare `pytest` with nothing
+  # running is green, because the integration tests skip themselves rather than
+  # erroring. If this job ever needs a database to pass, that invariant is
+  # broken and this job should be the thing that says so.
+  test-unit:
+    name: test (unit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install --quiet -e ".[dev]"
+      - name: pytest (integration tests self-skip)
+        run: pytest -q -m "not integration"
+
+  # --- 5. integration tests ---------------------------------------------
+  integration:
+    name: test (integration)
+    runs-on: ubuntu-latest
+    needs: [format, lint, typecheck, test-unit]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: sentinel
+          POSTGRES_DB: sentinel
+        ports: ["5432:5432"]
+        # Matches tests/integration/conftest.py, which probes once per URL and
+        # skips the suite if it cannot connect.
+        options: >-
+          --health-cmd "pg_isready -U sentinel -d sentinel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The test database, matching docker/postgres-init/01-create-test-db.sql.
+      SENTINEL_TEST_DATABASE_URL: postgresql+asyncpg://sentinel:sentinel@localhost:5432/sentinel_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install --quiet -e ".[dev]"
+
+      - name: Create the test database
+        # The init script in docker/compose only runs for the container's own
+        # data directory, so under the service container we create it here.
+        run: |
+          PGPASSWORD=sentinel psql -h localhost -U sentinel -d sentinel \
+            -c "CREATE DATABASE sentinel_test;"
+
+      - name: Apply migrations to the test database
+        env:
+          SENTINEL_DATABASE_URL: ${{ env.SENTINEL_TEST_DATABASE_URL }}
+        run: alembic upgrade head
+
+      - name: pytest -m integration
+        run: pytest -q -m integration
+
+  # --- 6. the container actually builds ----------------------------------
+  docker:
+    name: docker image builds
+    runs-on: ubuntu-latest
+    needs: [format, lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: sentinelmcp:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: The image starts and reports its policy check
+        # A build that produces an image which cannot answer /health is not a
+        # passing build. The migration runs first so the API has a schema.
+        run: |
+          docker network create sentinel-ci
+          docker run -d --name pg --network sentinel-ci \
+            -e POSTGRES_USER=sentinel -e POSTGRES_PASSWORD=sentinel \
+            -e POSTGRES_DB=sentinel postgres:16-alpine
+          until docker exec pg pg_isready -U sentinel -d sentinel; do sleep 1; done
+
+          docker run -d --name scanner --network sentinel-ci sentinelmcp:ci \
+            python -m backend.scripts.run_grpc_server --host 0.0.0.0 --port 50051
+
+          docker run --rm --network sentinel-ci \
+            -e SENTINEL_DATABASE_URL=postgresql+asyncpg://sentinel:sentinel@pg:5432/sentinel \
+            sentinelmcp:ci alembic upgrade head
+
+          docker run -d --name api --network sentinel-ci -p 8000:8000 sentinelmcp:ci \
+            uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health > /dev/null; then break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:8000/health
+          echo "--- policy ---"
+          # The guarantee, checked on a real running process rather than only
+          # in unit tests. This is the one assertion that must never change.
+          curl -fsS http://localhost:8000/health/policy
+
+          docker rm -f api scanner pg
+          docker network rm sentinel-ci
+
+      - name: The MCP surface works under this image's SDK major
+        # ADR 004 supports both `mcp` SDK majors with a shim, and this is the
+        # job that makes that claim tested rather than asserted.
+        #
+        # The container resolves **SDK v2** (the image does not install semgrep,
+        # and semgrep is what pins `mcp<2`), while a normal `pip install -e .`
+        # with semgrep present gets **v1**. So this job and the `verify-mcp`
+        # step above it run the same assertions against the two different
+        # branches of the shim. A change that only works on one major fails
+        # here instead of in a reviewer's environment.
+        run: |
+          docker network create sentinel-mcp
+          docker run -d --name mcp-pg --network sentinel-mcp \
+            -e POSTGRES_USER=sentinel -e POSTGRES_PASSWORD=sentinel \
+            -e POSTGRES_DB=sentinel postgres:16-alpine
+          until docker exec mcp-pg pg_isready -U sentinel -d sentinel; do sleep 1; done
+
+          docker run --rm --network sentinel-mcp \
+            -e SENTINEL_DATABASE_URL=postgresql+asyncpg://sentinel:sentinel@mcp-pg:5432/sentinel \
+            -e SENTINEL_SCANNER_TRANSPORT=in_process \
+            -e SENTINEL_TELEMETRY_SINK=null \
+            sentinelmcp:ci alembic upgrade head
+
+          docker run --rm --network sentinel-mcp \
+            -e SENTINEL_DATABASE_URL=postgresql+asyncpg://sentinel:sentinel@mcp-pg:5432/sentinel \
+            -e SENTINEL_SCANNER_TRANSPORT=in_process \
+            -e SENTINEL_TELEMETRY_SINK=null \
+            sentinelmcp:ci python scripts/verify_mcp_sdk.py
+
+          docker rm -f mcp-pg
+          docker network rm sentinel-mcp
+
+  # --- 7. the same MCP assertions on whatever major CI resolved -----------
+  #
+  # Deliberately a separate job from the container one, and deliberately the
+  # same script. Together they cover both branches of the shim; on their own
+  # each covers one and the ADR's claim is only half-tested.
+  mcp-sdk:
+    name: mcp sdk surface
+    runs-on: ubuntu-latest
+    needs: [format, lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install --quiet -e ".[dev]"
+      - name: report the SDK major this job resolved
+        run: python -c "from backend.mcp_server.server import mcp_sdk_major_version as v; print('MCP SDK major', v())"
+      - name: verify the MCP surface
+        # No database: the data-dependent checks report as SKIP rather than
+        # failing, and everything that needs no data is still asserted.
+        run: python scripts/verify_mcp_sdk.py
+
+  # --- 8. tier 1 of the evidence harness, in CI ---------------------------
+  #
+  # Only tier 1. Tiers 2 and 3 are deliberately excluded, and the reason is the
+  # same as Rule 1 in CLAUDE.md applied to a measurement: tier 2 fetches rule
+  # packs from semgrep.dev and tier 3 clones seven upstream repositories, so a
+  # flaky network or a rate limit turns into a red build that a contributor learns
+  # to re-run. A gate that cries wolf is worse than no gate.
+  #
+  # Tier 1 needs no network, no semgrep, no database, and no API key, and it runs
+  # in about two seconds. That makes it the only tier that can honestly gate a
+  # commit -- and gating it is the whole point, because a measurement that only
+  # runs when someone remembers will drift the first time a rewrite changes.
+  #
+  # What this catches: an engine that stops blocking a real exploit, a reviewer
+  # that starts rejecting correct patches, or a rewrite whose patch stops
+  # compiling. It is the reason the harness's findings stay findings.
+  evidence:
+    name: evidence (tier 1, execution)
+    runs-on: ubuntu-latest
+    needs: [format, lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install --quiet -e ".[dev]"
+      - name: do the patches still stop real exploits?
+        # The report prints to stdout as well as being used for the exit code, so
+        # a red run is diagnosable from the log without a local checkout.
+        #
+        # Not yet run on a Linux runner, so treat this job's first CI run as the
+        # real test of it. The two platform-dependent pieces are handled rather
+        # than assumed: the shell-injection case declares its expected
+        # behavioural outcome from `os.name`, and every other case binds an
+        # ephemeral port or touches the filesystem, both of which behave the same
+        # on both.
+        run: python scripts/evidence_report.py --tiers 1

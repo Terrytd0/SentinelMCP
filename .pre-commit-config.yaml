@@ -1,0 +1,64 @@
+# Pre-commit hooks. `make install` runs `pre-commit install`, so this file is
+# what makes that target work -- it was referenced by the Makefile and by a dev
+# dependency without existing.
+#
+# The hook set is deliberately the same trio CI runs (`make check`), and nothing
+# more. A formatter, a linter, and a type checker: each one has a single
+# unambiguous answer, so a pre-commit failure is never a judgement call about
+# someone else's style.
+#
+#   ruff-format   reformat in place
+#   ruff          lint what formatting cannot fix
+#   mypy          catch a wrong type that both of the above consider fine
+#
+# The revs below are the versions this project is actually developed and tested
+# against. They must stay equal to the pins in `.github/workflows/ci.yml` and to
+# what `uv sync` resolves, or a hook will disagree with `make check` on the same
+# commit. Note that ruff >= 0.16 also formats Python code blocks inside Markdown,
+# which is why the docs' code samples are formatted and not hand-aligned.
+#
+# Deliberately NOT here:
+#   * pytest       too slow for a pre-commit hook, and it needs a database for
+#                  the integration half. `make test` and CI cover it.
+#   * generated-code hooks
+#                  `backend/grpc_service/generated/` is regenerable from
+#                  proto/sentinel/v1/scanner.proto (`make proto`). Reformatting
+#                  it obscures what the generator decided, so ruff and mypy
+#                  both exclude the tree and no hook tries to "fix" it.
+#
+# To skip a hook for one commit: `SKIP=mypy git commit ...`
+
+default_language_version:
+  python: python3.13
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff-format
+        # Must stay consistent with the target-version in pyproject.toml.
+        args: [--target-version=py313]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1
+    hooks:
+      - id: mypy
+        # `mypy .` over the whole tree, matching the Makefile and CI. Passing
+        # filenames instead would silently skip a file nothing else imports.
+        args: [--config-file=pyproject.toml, .]
+        # Installed alongside the project, not from the hook's own pinned venv:
+        # mypy has to resolve sqlalchemy, fastapi, and pydantic to type-check
+        # anything here, and it should type-check them at the versions this
+        # project actually pins.
+        additional_dependencies:
+          - sqlalchemy>=2.0.0
+          - pydantic>=2.9.0
+          - fastapi>=0.115.0
+          - types-protobuf>=4.24.0
+        pass_filenames: false
